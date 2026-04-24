@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
 from transformers import pipeline
+import torch
 import os
 import threading
 
@@ -20,6 +21,7 @@ def get_classifier():
                     model=MODEL_ID,
                     truncation=True,
                     max_length=128,
+                    torch_dtype=torch.float16,
                 )
     return _classifier
 
