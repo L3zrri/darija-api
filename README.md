@@ -1,6 +1,6 @@
 ---
 title: Darija Bot
-emoji: 🇲🇦
+emoji: 🤖
 colorFrom: green
 colorTo: blue
 sdk: docker
