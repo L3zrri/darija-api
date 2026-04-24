@@ -54,7 +54,7 @@ def sentiment():
     clf = get_classifier()
     result = clf(text)[0]
 
-    label_map = {"LABEL_0": "negative", "LABEL_1": "positive"}
+    label_map = {"LABEL_0": "positive", "LABEL_1": "negative"}
     label = label_map.get(result["label"], result["label"].lower())
 
     return jsonify({
