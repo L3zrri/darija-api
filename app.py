@@ -7,6 +7,10 @@ import threading
 app = Flask(__name__)
 
 MODEL_ID = "BenhamdaneNawfal/sentiment-analysis-darija"
+LABEL_MAP = {"LABEL_0": "positive", "LABEL_1": "negative"}
+MAX_TEXT_LEN = 512
+MAX_BATCH_SIZE = 50
+
 _classifier = None
 _model_lock = threading.Lock()
 
@@ -26,17 +30,24 @@ def get_classifier():
     return _classifier
 
 
-# Warm up model on startup in background so first request isn't slow
 def _warmup():
     get_classifier()
 
 threading.Thread(target=_warmup, daemon=True).start()
 
 
+def classify(text: str) -> dict:
+    result = get_classifier()(text)[0]
+    return {
+        "text": text,
+        "label": LABEL_MAP.get(result["label"], result["label"].lower()),
+        "score": round(result["score"], 4),
+    }
+
+
 @app.route("/health", methods=["GET"])
 def health():
-    ready = _classifier is not None
-    return jsonify({"status": "ok", "model_ready": ready})
+    return jsonify({"status": "ok", "model_ready": _classifier is not None})
 
 
 @app.route("/sentiment", methods=["POST"])
@@ -48,20 +59,40 @@ def sentiment():
     text = data["text"].strip()
     if not text:
         return jsonify({"error": "Text cannot be empty"}), 400
-    if len(text) > 512:
-        return jsonify({"error": "Text exceeds 512 character limit"}), 400
+    if len(text) > MAX_TEXT_LEN:
+        return jsonify({"error": f"Text exceeds {MAX_TEXT_LEN} character limit"}), 400
 
-    clf = get_classifier()
-    result = clf(text)[0]
+    return jsonify(classify(text))
 
-    label_map = {"LABEL_0": "positive", "LABEL_1": "negative"}
-    label = label_map.get(result["label"], result["label"].lower())
 
-    return jsonify({
-        "text": text,
-        "label": label,
-        "score": round(result["score"], 4),
-    })
+@app.route("/batch", methods=["POST"])
+def batch():
+    data = request.get_json(silent=True)
+    if not data or "texts" not in data:
+        return jsonify({"error": "Missing 'texts' array in request body"}), 400
+
+    texts = data["texts"]
+    if not isinstance(texts, list):
+        return jsonify({"error": "'texts' must be an array of strings"}), 400
+    if not texts:
+        return jsonify({"error": "'texts' array cannot be empty"}), 400
+    if len(texts) > MAX_BATCH_SIZE:
+        return jsonify({"error": f"Batch size exceeds {MAX_BATCH_SIZE} items"}), 400
+
+    results = []
+    for i, t in enumerate(texts):
+        if not isinstance(t, str):
+            return jsonify({"error": f"Item at index {i} is not a string"}), 400
+        cleaned = t.strip()
+        if not cleaned:
+            results.append({"text": t, "error": "empty"})
+            continue
+        if len(cleaned) > MAX_TEXT_LEN:
+            results.append({"text": t[:50] + "...", "error": "too_long"})
+            continue
+        results.append(classify(cleaned))
+
+    return jsonify({"count": len(results), "results": results})
 
 
 if __name__ == "__main__":
