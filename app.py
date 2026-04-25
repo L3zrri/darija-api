@@ -6,8 +6,7 @@ import threading
 
 app = Flask(__name__)
 
-MODEL_ID = "BenhamdaneNawfal/sentiment-analysis-darija"
-LABEL_MAP = {"LABEL_0": "positive", "LABEL_1": "negative"}
+MODEL_ID = "cardiffnlp/twitter-xlm-roberta-base-sentiment"
 MAX_TEXT_LEN = 512
 MAX_BATCH_SIZE = 50
 
@@ -40,7 +39,7 @@ def classify(text: str) -> dict:
     result = get_classifier()(text)[0]
     return {
         "text": text,
-        "label": LABEL_MAP.get(result["label"], result["label"].lower()),
+        "label": result["label"].lower(),
         "score": round(result["score"], 4),
     }
 
